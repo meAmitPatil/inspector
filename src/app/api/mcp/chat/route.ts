@@ -123,7 +123,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Return a promise that will be resolved when user responds
-      return new Promise((resolve, reject) => {
+      return new Promise<{
+        action: "accept" | "decline" | "cancel";
+        content?: { [x: string]: unknown };
+        _meta?: { [x: string]: unknown };
+      }>((resolve, reject) => {
         pendingElicitations.set(requestId, { resolve, reject });
 
         // Set a timeout to clean up if no response
@@ -136,10 +140,17 @@ export async function POST(request: NextRequest) {
       });
     };
 
-    // Register elicitation handler with the client
-    if (client.elicitation && client.elicitation.onRequest) {
-      const serverName = "server"; // See createMCPClient() function. The name of the server is "server"
-      client.elicitation.onRequest(serverName, elicitationHandler);
+    // Register elicitation handler with the client for all servers
+    if (client.elicitation && client.elicitation.onRequest && serverConfigs) {
+      // Register elicitation handler for each server
+      for (const serverName of Object.keys(serverConfigs)) {
+        // Normalize server name to match MCPClient's internal naming
+        const normalizedName = serverName
+          .toLowerCase()
+          .replace(/[\s\-]+/g, "_")
+          .replace(/[^a-z0-9_]/g, "");
+        client.elicitation.onRequest(normalizedName, elicitationHandler);
+      }
     }
 
     // Wrap tools to capture tool calls and results
