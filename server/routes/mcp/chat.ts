@@ -246,7 +246,7 @@ chat.post("/", async (c) => {
       name: "MCP Chat Agent",
       instructions:
         systemPrompt || "You are a helpful assistant with access to MCP tools.",
-      model: llmModel,
+      model: llmModel as any, // TODO: Remove when Mastra supports AI SDK v5 (https://github.com/mastra-ai/mastra/issues/5470)
       tools: Object.keys(wrappedTools).length > 0 ? wrappedTools : undefined,
     });
 
