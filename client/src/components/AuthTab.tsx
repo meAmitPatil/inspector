@@ -22,6 +22,10 @@ import {
   EMPTY_OAUTH_FLOW_STATE,
 } from "../lib/oauth-flow-types";
 import { OAuthFlowProgress } from "./OAuthFlowProgress";
+import { OAuthWizard } from "./oauth/OAuthWizard";
+import { OAuthWizardSimple } from "./oauth/OAuthWizardSimple";
+import { OAuthEducationWizard } from "./oauth/OAuthEducationWizard";
+import { OAuthFocusedWizard } from "./oauth/OAuthFocusedWizard";
 import { OAuthStateMachine } from "../lib/oauth-state-machine";
 
 interface StatusMessageProps {
@@ -82,6 +86,7 @@ export const AuthTab = ({
     EMPTY_OAUTH_FLOW_STATE,
   );
   const [showGuidedFlow, setShowGuidedFlow] = useState(false);
+  const [useNewWizard, setUseNewWizard] = useState(true); // Feature flag for new OAuth wizard
 
   const updateAuthSettings = useCallback((updates: Partial<AuthSettings>) => {
     setAuthSettings((prev) => ({ ...prev, ...updates }));
@@ -308,22 +313,23 @@ export const AuthTab = ({
     updateOAuthFlowState,
   ]);
 
-  const startGuidedFlow = useCallback(() => {
+  const startGuidedFlow = useCallback(async () => {
     // First reset any existing flow state
     resetOAuthFlow();
 
-    // Then start the new guided flow
+    // Then start the new guided flow at step 1 (metadata_discovery)
     setShowGuidedFlow(true);
     updateOAuthFlowState(EMPTY_OAUTH_FLOW_STATE);
+    
+    // Immediately perform metadata discovery so step 1 shows completed state
     if (oauthStateMachine) {
-      oauthStateMachine.proceedToNextStep();
+      await oauthStateMachine.proceedToNextStep();
+      // After discovery, go back to step 1 to show completed state
+      updateOAuthFlowState({ oauthStep: "metadata_discovery" });
     }
   }, [
     oauthStateMachine,
     updateOAuthFlowState,
-    authSettings.serverUrl,
-    serverName,
-    serverConfig,
     resetOAuthFlow,
   ]);
 
@@ -632,19 +638,37 @@ export const AuthTab = ({
 
               {/* OAuth Flow Progress */}
               {showGuidedFlow && authSettings.serverUrl && (
-                <OAuthFlowProgress
-                  serverUrl={authSettings.serverUrl}
-                  flowState={oauthFlowState}
-                  updateFlowState={updateOAuthFlowState}
-                  proceedToNextStep={proceedToNextStep}
-                />
+                <>
+                  {useNewWizard ? (
+                    <OAuthFocusedWizard
+                      serverUrl={authSettings.serverUrl}
+                      flowState={oauthFlowState}
+                      updateFlowState={updateOAuthFlowState}
+                      proceedToNextStep={proceedToNextStep}
+                    />
+                  ) : (
+                    <OAuthFlowProgress
+                      serverUrl={authSettings.serverUrl}
+                      flowState={oauthFlowState}
+                      updateFlowState={updateOAuthFlowState}
+                      proceedToNextStep={proceedToNextStep}
+                    />
+                  )}
+                </>
               )}
 
               {/* Exit Guided Flow Button */}
               {showGuidedFlow && (
-                <div className="mt-4">
+                <div className="mt-4 flex gap-2">
                   <Button variant="outline" onClick={exitGuidedFlow}>
                     Exit Guided Flow
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setUseNewWizard(!useNewWizard)}
+                  >
+                    {useNewWizard ? "Use Legacy View" : "Use New Wizard"}
                   </Button>
                 </div>
               )}
